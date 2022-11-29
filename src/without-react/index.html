@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>simple redux app</title>
+
+    <style>
+        input,
+        textarea {
+            display: block;
+            margin-bottom: 20px;
+            padding: 10px;
+            font-size: 18px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="subject"></div>
+    <div id="toc"></div>
+    <div id="control"></div>
+    <div id="content"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/redux/4.2.0/redux.min.js"
+        integrity="sha512-1/8Tj23BRrWnKZXeBruk6wTnsMJbi/lJsk9bsRgVwb6j5q39n0A00gFjbCTaDo5l5XrPVv4DZXftrJExhRF/Ug=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+    <script>
+        const reducer = (state, action) => {
+            if (state === undefined) {
+                return {
+                    mode: 'create',
+                    selected_id: 0,
+                    contents: [
+                        {
+                            id: 0,
+                            title: "HTML",
+                            desc: "HTML is ..."
+                        },
+                        {
+                            id: 1,
+                            title: "CSS",
+                            desc: "CSS is ..."
+                        }
+                    ]
+                }
+            }
+            else if (action.type === "SELECT") {
+                return { ...state, selected_id: action.id, mode: "read" }
+            }
+            else if (action.type === "CREATE") {
+                return {
+                    ...state, mode: "read", selected_id: state.contents.length, contents: [
+                        ...state.contents,
+                        {
+                            id: state.contents.length,
+                            title: action.title,
+                            desc: action.desc,
+                        }
+                    ]
+                }
+            }
+            else if (action.type === "CREATECLICK") {
+                return { ...state, mode: "create" }
+            }
+            else if (action.type === "UPDATE") {
+                return {
+                    ...state, mode: "read", contents: [...state.contents].map((cont, index) => {
+                        if (index === action.id) {
+                            return { id: index, title: action.title, desc: action.desc };
+                        }
+                        else {
+                            return cont;
+                        }
+                    })
+                }
+            }
+            else if (action.type === "UPDATECLICK") {
+                return { ...state, mode: "update", selected_id: action.id }
+            }
+            else if (action.type === "DELETE") {
+                return {
+                    ...state, mode: "read", contents: [...state.contents].filter(x => x.id !== action.id), selected_id: [...state.contents].filter(x => x.id !== action.id)[0]?.id
+                }
+            }
+        }
+        const store = Redux.createStore(reducer);
+
+        // header component
+        (function subject() {
+            document.querySelector('#subject').innerHTML = `<header>
+                <h1>WEB</h1>
+                Hello, WEB!
+            </header>`
+        })();
+
+        // list component
+        function TOC() {
+            let lis = ``;
+            const contents = store.getState().contents;
+            let i = 0;
+            while (i < contents.length) {
+                lis += `
+                    <li>
+                        <a onclick="aClick(event,${contents[i].id})"
+                        href="${contents[i].id}">${contents[i].title}</a>
+                    </li>`
+                i++;
+            }
+            document.querySelector('#toc').innerHTML = `<nav>
+                <ol>
+                    ${lis}
+                </ol>
+            </nav>`
+        }
+
+        // button component
+        function control() {
+            const state = store.getState();
+            if (state.mode === "read") {
+                if (state.contents.length === 0) {
+                    document.querySelector('#control').innerHTML = `<ul>
+                        <li><a onclick="cClick(event)" href="/create">create</a></li>
+                    </ul>`
+                }
+                else {
+                    document.querySelector('#control').innerHTML = `<ul>
+                        <li><a onclick="cClick(event)" href="/create">create</a></li>
+                        <li><a onclick="uClick(event, ${state.selected_id})" href="/create">update</a></li>
+                        <li><button onclick="dClick(event)">delete</button></li>
+                    </ul>`
+                }
+            }
+            else {
+                document.querySelector('#control').innerHTML = '';
+            }
+        };
+
+        // content component
+        function content() {
+            const state = store.getState();
+            if (state.mode === 'create') {
+                document.querySelector('#content').innerHTML = `
+                <article>
+                    <form onsubmit="onSubmit(event)">
+                        <input type="text" placeholder="title...">
+                        <textarea placeholder="content..." rows=10 cols=30></textarea>
+                        <input type="submit" value="작성">
+                    </form>
+                </article>`;
+            } else if (state.mode === 'read') {
+                if (state.contents.length === 0) {
+                    document.querySelector('#content').innerHTML = `<article>
+                    <h2>컨텐츠를 다 삭제하였습니다.</h2>
+                </article>`;
+                } else {
+                    let aTitle, aDesc;
+                    let i = 0;
+                    while (i < state.contents.length) {
+                        if (state.selected_id === state.contents[i].id) {
+                            aTitle = state.contents[i].title;
+                            aDesc = state.contents[i].desc;
+                            break;
+                        }
+                        i++;
+                    }
+                    document.querySelector('#content').innerHTML = `<article>
+                    <h2>${aTitle}</h2>
+                    ${aDesc}
+                </article>`;
+                }
+            } else if (state.mode === 'update') {
+                let aTitle = state.contents[state.selected_id].title;
+                let aDesc = state.contents[state.selected_id].desc;
+
+                document.querySelector('#content').innerHTML = `
+                <article>
+                    <form onsubmit="onSubmitUpdate(event,${state.selected_id})">
+                        <input type="text" placeholder="title..." value=${aTitle}>
+                        <textarea placeholder="content..." rows=10 cols=30>${aDesc}</textarea>
+                        <input type="submit" value="작성">
+                    </form>
+                </article>`;
+            }
+        }
+
+        content();
+        TOC();
+        control();
+
+        const aClick = (event, id) => {
+            event.preventDefault();
+            const action = { type: "SELECT", id }
+            store.dispatch(action)
+        }
+        const cClick = (event) => {
+            event.preventDefault();
+            store.dispatch({
+                type: "CREATECLICK"
+            });
+        }
+        const uClick = (event, id) => {
+            event.preventDefault();
+            store.dispatch({
+                type: "UPDATECLICK",
+                id
+            });
+        }
+        const dClick = (event) => {
+            event.preventDefault();
+            const state = store.getState();
+            store.dispatch({
+                type: "DELETE",
+                id: state.selected_id
+            });
+        }
+        function onSubmit(event) {
+            event.preventDefault();
+            let title = event.target[0].value;
+            let desc = event.target[1].value;
+            store.dispatch({
+                type: "CREATE",
+                title,
+                desc
+            })
+        }
+        function onSubmitUpdate(event, id) {
+            event.preventDefault();
+            let title = event.target[0].value;
+            let desc = event.target[1].value;
+            store.dispatch({
+                type: "UPDATE",
+                id,
+                title,
+                desc
+            })
+        }
+        store.subscribe(content);
+        store.subscribe(control);
+        store.subscribe(TOC);
+    </script>
+</body>
+
+</html>
